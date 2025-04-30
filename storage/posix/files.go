@@ -127,6 +127,14 @@ func (s *Storage) Appender(ctx context.Context, opts *tessera.AppendOptions) (*t
 	}, a.logStorage, nil
 }
 
+func (s *Storage) FrozenLogReader(ctx context.Context) (tessera.LogReader, error) {
+	logStorage := &logResourceStorage{
+		s:           s,
+		entriesPath: layout.EntriesPath,
+	}
+	return logStorage, nil
+}
+
 // lockFile creates/opens a lock file at the specified path, and flocks it.
 // Once locked, the caller perform whatever operations are necessary, before
 // calling the returned function to unlock it.

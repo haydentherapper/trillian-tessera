@@ -119,6 +119,10 @@ func (s *Storage) Appender(ctx context.Context, opts *tessera.AppendOptions) (*t
 	}, s, nil
 }
 
+func (s *Storage) FrozenLogReader(_ context.Context) (tessera.LogReader, error) {
+	return s, nil
+}
+
 func (s *Storage) ensureVersion(ctx context.Context, wantVersion uint8) error {
 	row := s.db.QueryRowContext(ctx, selectCompatibilityVersionSQL)
 	if row.Err() != nil {

@@ -53,6 +53,7 @@ import (
 	"github.com/transparency-dev/trillian-tessera/api"
 	"github.com/transparency-dev/trillian-tessera/api/layout"
 	"github.com/transparency-dev/trillian-tessera/internal/otel"
+	"github.com/transparency-dev/trillian-tessera/internal/parse"
 	storage "github.com/transparency-dev/trillian-tessera/storage/internal"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/googleapi"
@@ -243,6 +244,37 @@ func (s *Storage) Appender(ctx context.Context, opts *tessera.AppendOptions) (*t
 	return &tessera.Appender{
 		Add: a.Add,
 	}, reader, nil
+}
+
+func (s *Storage) FrozenLogReader(ctx context.Context) (tessera.LogReader, error) {
+	c, err := gcs.NewClient(ctx, gcs.WithJSONReads())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCS client: %v", err)
+	}
+	logStore := logResourceStore{
+		objStore: &gcsStorage{
+			gcsClient:    c,
+			bucket:       s.cfg.Bucket,
+			bucketPrefix: s.cfg.BucketPrefix,
+		},
+		entriesPath: layout.EntriesPath,
+	}
+	reader := &LogReader{
+		lrs: logStore,
+	}
+	cp, err := reader.ReadCheckpoint(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read latest checkpoint: %v", err)
+	}
+	_, size, _, err := parse.CheckpointUnsafe(cp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse latest checkpoint: %v", err)
+	}
+	f := func(ctx context.Context) (uint64, error) { return size, nil }
+	reader.integratedSize = f
+	reader.nextIndex = f
+
+	return reader, nil
 }
 
 // Appender is an implementation of the Tessera appender lifecycle contract.
